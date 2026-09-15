@@ -33,7 +33,7 @@ const SHEETS = {
   rupa: {
     name: "Rupa",
     range: "A:L",
-    headerIndex: 1,
+    headerIndex: 0,
   },
 };
 
@@ -85,6 +85,8 @@ async function readSheet(sheetsApi, sheetName, range, headerIndex) {
   console.log(`Range: ${range}`);
 
   console.log(`Header Index: ${headerIndex}`);
+
+  console.log(`Header ${sheetName}:`, headers);
 
   // ------------------------------------------
   // REQUEST GOOGLE SHEETS
@@ -161,84 +163,135 @@ async function readSheet(sheetsApi, sheetName, range, headerIndex) {
 // NORMALIZE PROCUREMENT
 // ======================================================
 
+function getField(row, aliases) {
+  const keys = Object.keys(row);
+
+  for (const alias of aliases) {
+    const normalizedAlias = String(alias).toLowerCase().replace(/\s+/g, " ").trim();
+
+    const foundKey = keys.find((key) => {
+      const normalizedKey = String(key).toLowerCase().replace(/\s+/g, " ").trim();
+
+      return normalizedKey === normalizedAlias;
+    });
+
+    if (foundKey !== undefined) {
+      return row[foundKey] ?? "";
+    }
+  }
+
+  return "";
+}
+
 function normalizeProcurement(rows, source) {
   return rows.map((row) => ({
     source,
 
-    no: row["No"] || "",
+    no: getField(row, ["No", "NO"]),
 
-    nomorPaket: row["No. Paket Pekerjaan (PK)"] || row["No Paket Pekerjaan (PK)"] || row["No Paket Pekerjaan"] || "",
+    nomorPaket: getField(row, ["No. Paket Pekerjaan (PK)", "No Paket Pekerjaan (PK)", "No Paket Pekerjaan", "Nomor Paket Pekerjaan", "Nomor Paket"]),
 
-    uraianPekerjaan: row["Uraian Pekerjaan"] || "",
+    uraianPekerjaan: getField(row, ["Uraian Pekerjaan", "Uraian pekerjaan", "Judul Pekerjaan"]),
 
-    bagian: row["Bagian"] || "",
+    bagian: getField(row, ["Bagian"]),
 
-    nilaiHPS: row["Nilai HPS (Rp)"] || "",
+    nilaiHPS: getField(row, ["Nilai HPS (Rp)", "Nilai HPS", "HPS"]),
 
-    jenisPengadaan: row["Jenis Pengadaan"] || "",
+    jenisPengadaan: getField(row, ["Jenis Pengadaan", "Jenis"]),
 
-    metodePemilihan: row["Metode Pemilihan"] || "",
+    metodePemilihan: getField(row, ["Metode Pemilihan", "Metode Pemilihan yang digunakan"]),
 
-    vendor: row["Vendor yg disarankan"] || row["Vendor yang disarankan"] || "",
+    vendor: getField(row, ["Vendor yg disarankan", "Vendor yang disarankan", "Vendor"]),
 
-    keterangan: row["Keterangan"] || "",
+    keterangan: getField(row, ["Keterangan"]),
 
-    pic: row["PIC"] || "",
+    pic: getField(row, ["PIC"]),
 
-    tim: row["Tim/TIM"] || row["Tim"] || "",
+    tim: getField(row, ["Tim/TIM", "Tim", "TIM"]),
 
-    dokumenPengadaan: row["Dokumen Pengadaan"] || "",
+    dokumenPengadaan: getField(row, ["Dokumen Pengadaan"]),
 
-    progress: row["Progress"] || "",
+    progress: getField(row, ["Progress", "Progres"]),
 
-    tenderUlang1: row["Tender Ulang I"] || "",
+    tenderUlang1: getField(row, ["Tender Ulang I"]),
 
-    tenderUlang2: row["Tender Ulang II"] || "",
+    tenderUlang2: getField(row, ["Tender Ulang II"]),
 
-    tenderUlang3: row["Tender Ulang III"] || "",
+    tenderUlang3: getField(row, ["Tender Ulang III"]),
 
-    tenderUlang4: row["Tender Ulang IV"] || "",
+    tenderUlang4: getField(row, ["Tender Ulang IV"]),
 
-    kembaliHps: row["Kembali ke HPS / Teknis"] || row["Kembali ke HPS/Teknis"] || "",
+    kembaliHps: getField(row, ["Kembali ke HPS / Teknis", "Kembali ke HPS/Teknis"]),
 
-    nilaiAnggaran: row["Nilai Anggaran / PPAB"] || row["Nilai Anggaran / PAB"] || "",
+    nilaiAnggaran: getField(row, ["Nilai Anggaran / PPAB", "Nilai Anggaran / PAB", "Nilai Anggaran", "PPAB", "PAB"]),
 
-    noRup: row["No RUP"] || "",
+    noRup: getField(row, ["No RUP", "No. RUP", "Nomor RUP"]),
   }));
 }
-
-// ======================================================
-// NORMALIZE RUPA
-// ======================================================
 
 function normalizeRupa(rows) {
-  return rows.map((row) => ({
-    no: row["NO"] || row["No"] || "",
+    return rows.map((row) => ({
+        no: getField(row, [
+            "NO",
+            "No",
+        ]),
 
-    nomorRupa: row["Nomor RUPA"] || "",
+        nomorRupa: getField(row, [
+            "Nomor RUPA",
+            "No RUPA",
+            "No. RUPA",
+        ]),
 
-    judulPekerjaan: row["Judul Pekerjaan"] || "",
+        judulPekerjaan: getField(row, [
+            "Judul Pekerjaan",
+            "Uraian Pekerjaan",
+        ]),
 
-    bulan: row["Rencana Waktu Pelaksanaan — Bulan"] || row["Rencana Waktu Pelaksanaan - Bulan"] || row["Rencana Waktu Pelaksanaan – Bulan"] || "",
+        bulan: getField(row, [
+            "Rencana Waktu Pelaksanaan — Bulan",
+            "Rencana Waktu Pelaksanaan - Bulan",
+            "Rencana Waktu Pelaksanaan – Bulan",
+            "Rencana Waktu Pelaksanaan",
+            "Bulan",
+        ]),
 
-    tahun: row["Tahun"] || "",
+        tahun: getField(row, [
+            "Tahun",
+        ]),
 
-    jenisPengadaan: row["Jenis Pengadaan"] || "",
+        jenisPengadaan: getField(row, [
+            "Jenis Pengadaan",
+            "Jenis",
+        ]),
 
-    estimasiNilai: row["Estimasi Nilai Pekerjaan"] || "",
+        estimasiNilai: getField(row, [
+            "Estimasi Nilai Pekerjaan",
+            "Estimasi Nilai",
+        ]),
 
-    metodePemilihan: row["Metode Pemilihan yang digunakan"] || row["Metode Pemilihan Yang digunakan"] || "",
+        metodePemilihan: getField(row, [
+            "Metode Pemilihan yang digunakan",
+            "Metode Pemilihan Yang digunakan",
+            "Metode Pemilihan",
+        ]),
 
-    rencanaCapaian: row["Rencana Capaian Produk"] || "",
+        rencanaCapaian: getField(row, [
+            "Rencana Capaian Produk",
+        ]),
 
-    sumberAnggaran: row["Sumber Anggaran"] || "",
+        sumberAnggaran: getField(row, [
+            "Sumber Anggaran",
+        ]),
 
-    keterangan: row["Keterangan"] || "",
+        keterangan: getField(row, [
+            "Keterangan",
+        ]),
 
-    bagian: row["Bagian"] || "",
-  }));
+        bagian: getField(row, [
+            "Bagian",
+        ]),
+    }));
 }
-
 // ======================================================
 // MAIN NETLIFY FUNCTION
 // ======================================================
