@@ -1,0 +1,1261 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Monitoring Pengadaan 2026</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- SheetJS -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+    <style>
+      body {
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      .sidebar-item {
+        transition: all 0.2s ease;
+      }
+
+      .sidebar-item.active {
+        background: #eef2ff;
+        color: #4f46e5;
+        font-weight: 600;
+      }
+
+      .sidebar-item:hover {
+        background: #f3f4f6;
+      }
+
+      .loading-spinner {
+        width: 36px;
+        height: 36px;
+        border: 4px solid #e5e7eb;
+        border-top-color: #4f46e5;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: #f3f4f6;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: #d1d5db;
+        border-radius: 8px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: #9ca3af;
+      }
+    </style>
+  </head>
+
+  <body class="bg-gray-100 text-gray-800">
+    <!-- =====================================================
+         LOGIN / ERROR SCREEN
+    ====================================================== -->
+
+    <div id="systemMessage" class="hidden fixed inset-0 z-50 bg-gray-100 flex items-center justify-center p-6">
+      <div class="bg-white rounded-2xl shadow-lg max-w-lg w-full p-8">
+        <div id="systemIcon" class="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-2xl mb-5">!</div>
+
+        <h2 id="systemTitle" class="text-xl font-bold text-gray-900 mb-2">Terjadi Kesalahan</h2>
+
+        <p id="systemText" class="text-gray-600 leading-relaxed">Tidak dapat mengambil data.</p>
+
+        <div id="systemDetail" class="hidden mt-4 p-4 bg-gray-50 border rounded-lg text-sm text-gray-600 whitespace-pre-wrap"></div>
+
+        <button onclick="loadData()" class="mt-6 px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Coba Lagi</button>
+      </div>
+    </div>
+
+    <!-- =====================================================
+         LOADING SCREEN
+    ====================================================== -->
+
+    <div id="loadingScreen" class="fixed inset-0 z-40 bg-white flex items-center justify-center">
+      <div class="text-center">
+        <div class="loading-spinner mx-auto mb-5"></div>
+
+        <h2 class="font-semibold text-gray-800">Memuat Dashboard</h2>
+
+        <p class="text-sm text-gray-500 mt-1">Mengambil data dari server...</p>
+      </div>
+    </div>
+
+    <!-- =====================================================
+         MAIN APPLICATION
+    ====================================================== -->
+
+    <div id="app" class="hidden min-h-screen">
+      <!-- SIDEBAR -->
+
+      <aside class="fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-gray-200 z-30">
+        <div class="h-full flex flex-col">
+          <!-- LOGO -->
+
+          <div class="px-6 py-6 border-b">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">P</div>
+
+              <div>
+                <h1 class="font-bold text-gray-900">Monitoring</h1>
+
+                <p class="text-xs text-gray-500">Pengadaan 2026</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- NAVIGATION -->
+
+          <nav class="p-4 space-y-1 flex-1">
+            <button onclick="showPage('dashboard')" id="nav-dashboard" class="sidebar-item active w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left">
+              <span>▦</span>
+              <span>Dashboard</span>
+            </button>
+
+            <button onclick="showPage('rupa')" id="nav-rupa" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left">
+              <span>▤</span>
+              <span>Rupa</span>
+            </button>
+
+            <button onclick="showPage('report')" id="nav-report" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left">
+              <span>▥</span>
+              <span>Report</span>
+            </button>
+
+            <button onclick="showPage('efisiensi')" id="nav-efisiensi" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left">
+              <span>◈</span>
+              <span>Efisiensi</span>
+            </button>
+          </nav>
+
+          <!-- USER -->
+
+          <div class="border-t p-4">
+            <p class="text-xs text-gray-400 mb-1">Login</p>
+
+            <p id="userEmail" class="text-sm font-medium truncate">-</p>
+
+            <button onclick="loadData()" class="mt-3 text-xs text-indigo-600 hover:underline">Refresh Data</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- =================================================
+             CONTENT
+        ================================================== -->
+
+      <main class="ml-64 min-h-screen">
+        <!-- HEADER -->
+
+        <header class="h-20 bg-white border-b flex items-center justify-between px-8 sticky top-0 z-20">
+          <div>
+            <h2 id="pageTitle" class="text-xl font-bold text-gray-900">Dashboard</h2>
+
+            <p id="pageSubtitle" class="text-sm text-gray-500">Monitoring Pengadaan 2026</p>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 text-sm text-gray-500">
+              <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+
+              Live Data
+            </div>
+
+            <span id="lastUpdate" class="text-xs text-gray-400"> - </span>
+          </div>
+        </header>
+
+        <!-- =================================================
+                 DASHBOARD PAGE
+            ================================================== -->
+
+        <section id="page-dashboard" class="page p-8">
+          <!-- FILTER -->
+
+          <div class="bg-white rounded-xl border p-5 mb-6">
+            <div class="flex flex-col md:flex-row md:items-end gap-4">
+              <div class="flex-1">
+                <label class="block text-sm font-medium mb-2"> Bagian </label>
+
+                <select id="filterBagian" onchange="renderDashboard()" class="w-full border rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="">Semua Bagian</option>
+                </select>
+              </div>
+
+              <div class="flex-1">
+                <label class="block text-sm font-medium mb-2"> Jenis Pengadaan </label>
+
+                <select id="filterJenis" onchange="renderDashboard()" class="w-full border rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="">Semua Jenis</option>
+                </select>
+              </div>
+
+              <button onclick="resetFilters()" class="px-5 py-2.5 border rounded-lg hover:bg-gray-50">Reset</button>
+            </div>
+          </div>
+
+          <!-- SCORECARDS -->
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+            <div class="bg-white rounded-xl border p-5">
+              <p class="text-sm text-gray-500">Total Paket</p>
+
+              <p id="totalPaket" class="text-3xl font-bold mt-2">0</p>
+            </div>
+
+            <div class="bg-white rounded-xl border p-5">
+              <p class="text-sm text-gray-500">Jumlah Tender</p>
+
+              <p id="totalTender" class="text-3xl font-bold text-indigo-600 mt-2">0</p>
+            </div>
+
+            <div class="bg-white rounded-xl border p-5">
+              <p class="text-sm text-gray-500">Jumlah PL</p>
+
+              <p id="totalPL" class="text-3xl font-bold text-emerald-600 mt-2">0</p>
+            </div>
+
+            <div class="bg-white rounded-xl border p-5">
+              <p class="text-sm text-gray-500">Total HPS</p>
+
+              <p id="totalHPS" class="text-xl font-bold mt-3">Rp 0</p>
+            </div>
+          </div>
+
+          <!-- STATUS -->
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+            <div class="bg-white rounded-xl border p-5">
+              <p class="text-sm text-gray-500">SPPBJ Terbit</p>
+
+              <p id="statusSPPBJ" class="text-2xl font-bold mt-2">0</p>
+            </div>
+
+            <div class="bg-white rounded-xl border p-5">
+              <p class="text-sm text-gray-500">Masih Proses</p>
+
+              <p id="statusProses" class="text-2xl font-bold mt-2">0</p>
+            </div>
+
+            <div class="bg-white rounded-xl border p-5">
+              <p class="text-sm text-gray-500">Config</p>
+
+              <p id="statusConfig" class="text-2xl font-bold mt-2">0</p>
+            </div>
+
+            <div class="bg-white rounded-xl border p-5">
+              <p class="text-sm text-gray-500">Gagal / Dikembalikan</p>
+
+              <p id="statusGagal" class="text-2xl font-bold mt-2">0</p>
+            </div>
+          </div>
+
+          <!-- CHARTS -->
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white rounded-xl border p-6">
+              <h3 class="font-semibold mb-5">Tender vs Penunjukan Langsung</h3>
+
+              <div class="h-80">
+                <canvas id="jenisChart"></canvas>
+              </div>
+            </div>
+
+            <div class="bg-white rounded-xl border p-6">
+              <h3 class="font-semibold mb-5">Distribusi Status</h3>
+
+              <div class="h-80">
+                <canvas id="statusChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- TABLE -->
+
+          <div class="bg-white rounded-xl border mt-6">
+            <div class="p-5 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <h3 class="font-semibold">Data Paket Pengadaan</h3>
+
+                <p id="tableInfo" class="text-xs text-gray-500 mt-1">0 data</p>
+              </div>
+
+              <button onclick="exportDashboard()" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">Export Excel</button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b">
+                  <tr>
+                    <th class="px-4 py-3 text-left">No</th>
+
+                    <th class="px-4 py-3 text-left">No. Paket</th>
+
+                    <th class="px-4 py-3 text-left">Uraian Pekerjaan</th>
+
+                    <th class="px-4 py-3 text-left">Bagian</th>
+
+                    <th class="px-4 py-3 text-left">Jenis</th>
+
+                    <th class="px-4 py-3 text-left">Metode</th>
+
+                    <th class="px-4 py-3 text-right">HPS</th>
+
+                    <th class="px-4 py-3 text-left">Progress</th>
+                  </tr>
+                </thead>
+
+                <tbody id="dashboardTable" class="divide-y"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================
+                 RUPA PAGE
+            ================================================== -->
+
+        <section id="page-rupa" class="page hidden p-8">
+          <div class="bg-white rounded-xl border">
+            <div class="p-6 border-b">
+              <h3 class="font-semibold text-lg">Rencana Umum Pengadaan</h3>
+
+              <p class="text-sm text-gray-500 mt-1">Data dari sheet Rupa</p>
+            </div>
+
+            <div class="p-5 flex flex-col md:flex-row gap-3">
+              <input id="rupaSearch" oninput="renderRupa()" type="text" placeholder="Cari pekerjaan, nomor RUPA, bagian..." class="flex-1 border rounded-lg px-4 py-2.5" />
+
+              <select id="rupaBagian" onchange="renderRupa()" class="border rounded-lg px-4 py-2.5">
+                <option value="">Semua Bagian</option>
+              </select>
+
+              <button onclick="exportRupa()" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg">Export Excel</button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-y">
+                  <tr>
+                    <th class="px-4 py-3 text-left">No</th>
+
+                    <th class="px-4 py-3 text-left">Nomor RUPA</th>
+
+                    <th class="px-4 py-3 text-left">Judul Pekerjaan</th>
+
+                    <th class="px-4 py-3 text-left">Bulan</th>
+
+                    <th class="px-4 py-3 text-left">Tahun</th>
+
+                    <th class="px-4 py-3 text-left">Jenis Pengadaan</th>
+
+                    <th class="px-4 py-3 text-right">Estimasi</th>
+
+                    <th class="px-4 py-3 text-left">Metode</th>
+
+                    <th class="px-4 py-3 text-left">Bagian</th>
+                  </tr>
+                </thead>
+
+                <tbody id="rupaTable" class="divide-y"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================
+                 REPORT PAGE
+            ================================================== -->
+
+        <section id="page-report" class="page hidden p-8">
+          <div class="bg-white rounded-xl border">
+            <div class="p-6 border-b">
+              <h3 class="font-semibold text-lg">Report Pengadaan</h3>
+
+              <p class="text-sm text-gray-500 mt-1">Rekapitulasi data pengadaan</p>
+            </div>
+
+            <div class="p-6">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div class="border rounded-xl p-5">
+                  <p class="text-sm text-gray-500">SPPBJ</p>
+
+                  <p id="reportSPPBJ" class="text-3xl font-bold mt-2">0</p>
+                </div>
+
+                <div class="border rounded-xl p-5">
+                  <p class="text-sm text-gray-500">Proses Tender</p>
+
+                  <p id="reportTender" class="text-3xl font-bold mt-2">0</p>
+                </div>
+
+                <div class="border rounded-xl p-5">
+                  <p class="text-sm text-gray-500">Kembali</p>
+
+                  <p id="reportKembali" class="text-3xl font-bold mt-2">0</p>
+                </div>
+              </div>
+
+              <div class="mt-6">
+                <button onclick="exportReport()" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg">Export Report Excel</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- =================================================
+                 EFISIENSI PAGE
+            ================================================== -->
+
+        <section id="page-efisiensi" class="page hidden p-8">
+          <div class="bg-white rounded-xl border p-8">
+            <h3 class="text-lg font-semibold">Efisiensi Pengadaan</h3>
+
+            <p class="text-gray-500 text-sm mt-2">Perhitungan efisiensi akan diaktifkan setelah formula nilai akhir pengadaan dikonfirmasi.</p>
+
+            <div class="mt-6 p-5 bg-amber-50 border border-amber-200 rounded-xl">
+              <p class="font-medium text-amber-800">Formula belum dikonfigurasi</p>
+
+              <p class="text-sm text-amber-700 mt-1">Sistem tidak akan mengasumsikan bahwa HPS dikurangi PPAB adalah efisiensi.</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      // =====================================================
+      // GLOBAL DATA
+      // =====================================================
+
+      let DATA = {
+        sppbj: [],
+        prosesTender: [],
+        config: [],
+        kembali: [],
+        rupa: [],
+      };
+
+      let jenisChart = null;
+      let statusChart = null;
+
+      // =====================================================
+      // UTILITY
+      // =====================================================
+
+      function formatRupiah(value) {
+        if (value === null || value === undefined || value === "") {
+          return "Rp 0";
+        }
+
+        let number = parseNumber(value);
+
+        return new Intl.NumberFormat("id-ID", {
+          style: "currency",
+          currency: "IDR",
+          maximumFractionDigits: 0,
+        }).format(number);
+      }
+
+      function parseNumber(value) {
+        if (typeof value === "number") {
+          return value;
+        }
+
+        if (!value) {
+          return 0;
+        }
+
+        let text = String(value).replace(/Rp/gi, "").replace(/\s/g, "").replace(/\./g, "").replace(/,/g, ".");
+
+        let number = parseFloat(text);
+
+        return Number.isFinite(number) ? number : 0;
+      }
+
+      function escapeHTML(value) {
+        if (value === null || value === undefined) {
+          return "";
+        }
+
+        return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+      }
+
+      function uniqueValues(array) {
+        return [...new Set(array.map((v) => String(v || "").trim()).filter(Boolean))].sort();
+      }
+
+      // =====================================================
+      // LOAD DATA
+      // =====================================================
+
+      async function loadData() {
+        hideSystemMessage();
+
+        document.getElementById("loadingScreen").classList.remove("hidden");
+
+        document.getElementById("app").classList.add("hidden");
+
+        try {
+          console.log("Memanggil get-data...");
+
+          const response = await fetch("/.netlify/functions/get-data", {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              Accept: "application/json",
+            },
+          });
+
+          console.log("HTTP Status:", response.status);
+
+          const responseText = await response.text();
+
+          console.log("Response:", responseText);
+
+          // ---------------------------------------------
+          // 404
+          // ---------------------------------------------
+
+          if (response.status === 404) {
+            throw new Error("Function get-data tidak ditemukan (HTTP 404).\n\n" + "Pastikan file berada di:\n" + "netlify/functions/get-data.js\n\n" + "dan netlify.toml berisi:\n" + "[functions]\n" + 'directory = "netlify/functions"');
+          }
+
+          // ---------------------------------------------
+          // 401
+          // ---------------------------------------------
+
+          if (response.status === 401) {
+            throw new Error("Anda belum login ke sistem.\n\n" + "Netlify Identity perlu dikonfigurasi sebelum " + "Function dapat membaca data.");
+          }
+
+          // ---------------------------------------------
+          // OTHER ERROR
+          // ---------------------------------------------
+
+          if (!response.ok) {
+            throw new Error("Server mengembalikan HTTP " + response.status + ".\n\n" + responseText);
+          }
+
+          // ---------------------------------------------
+          // PARSE JSON
+          // ---------------------------------------------
+
+          let result;
+
+          try {
+            result = JSON.parse(responseText);
+          } catch (parseError) {
+            throw new Error("Server tidak mengembalikan JSON yang valid.\n\n" + responseText.substring(0, 500));
+          }
+
+          // ---------------------------------------------
+          // SERVER SUCCESS
+          // ---------------------------------------------
+
+          if (!result.success) {
+            throw new Error(result.message || result.error || "Server gagal mengambil data.");
+          }
+
+          // ---------------------------------------------
+          // SAVE DATA
+          // ---------------------------------------------
+
+          DATA = result.data || DATA;
+
+          console.log("Data berhasil:", DATA);
+
+          // ---------------------------------------------
+          // USER
+          // ---------------------------------------------
+
+          if (result.user && result.user.email) {
+            document.getElementById("userEmail").textContent = result.user.email;
+          }
+
+          // ---------------------------------------------
+          // LAST UPDATE
+          // ---------------------------------------------
+
+          if (result.meta && result.meta.fetchedAt) {
+            document.getElementById("lastUpdate").textContent = new Date(result.meta.fetchedAt).toLocaleString("id-ID");
+          }
+
+          // ---------------------------------------------
+          // FILTER
+          // ---------------------------------------------
+
+          populateFilters();
+
+          // ---------------------------------------------
+          // RENDER
+          // ---------------------------------------------
+
+          renderDashboard();
+          renderRupa();
+          renderReport();
+
+          // ---------------------------------------------
+          // SHOW APP
+          // ---------------------------------------------
+
+          document.getElementById("loadingScreen").classList.add("hidden");
+
+          document.getElementById("app").classList.remove("hidden");
+        } catch (error) {
+          console.error("loadData error:", error);
+
+          document.getElementById("loadingScreen").classList.add("hidden");
+
+          showSystemMessage("Gagal Memuat Data", "Dashboard tidak dapat mengambil data dari server.", error.message);
+        }
+      }
+
+      // =====================================================
+      // FILTER
+      // =====================================================
+
+      function populateFilters() {
+        const allProcurement = [...DATA.sppbj, ...DATA.prosesTender, ...DATA.config, ...DATA.kembali];
+
+        const bagian = uniqueValues(allProcurement.map((item) => item.bagian));
+
+        const jenis = uniqueValues(allProcurement.map((item) => item.jenisPengadaan));
+
+        const bagianSelect = document.getElementById("filterBagian");
+
+        const jenisSelect = document.getElementById("filterJenis");
+
+        bagianSelect.innerHTML = `<option value="">Semua Bagian</option>`;
+
+        jenisSelect.innerHTML = `<option value="">Semua Jenis</option>`;
+
+        bagian.forEach((value) => {
+          const option = document.createElement("option");
+
+          option.value = value;
+          option.textContent = value;
+
+          bagianSelect.appendChild(option);
+        });
+
+        jenis.forEach((value) => {
+          const option = document.createElement("option");
+
+          option.value = value;
+          option.textContent = value;
+
+          jenisSelect.appendChild(option);
+        });
+
+        // RUPA
+
+        const rupaBagian = uniqueValues(DATA.rupa.map((item) => item.bagian));
+
+        const rupaBagianSelect = document.getElementById("rupaBagian");
+
+        rupaBagianSelect.innerHTML = `<option value="">Semua Bagian</option>`;
+
+        rupaBagian.forEach((value) => {
+          const option = document.createElement("option");
+
+          option.value = value;
+          option.textContent = value;
+
+          rupaBagianSelect.appendChild(option);
+        });
+      }
+
+      function resetFilters() {
+        document.getElementById("filterBagian").value = "";
+
+        document.getElementById("filterJenis").value = "";
+
+        renderDashboard();
+      }
+
+      // =====================================================
+      // PROCUREMENT DATA
+      // =====================================================
+
+      function getAllProcurement() {
+        return [...DATA.sppbj, ...DATA.prosesTender, ...DATA.config, ...DATA.kembali];
+      }
+
+      function getFilteredProcurement() {
+        const bagian = document.getElementById("filterBagian").value;
+
+        const jenis = document.getElementById("filterJenis").value;
+
+        return getAllProcurement().filter((item) => {
+          if (bagian && item.bagian !== bagian) {
+            return false;
+          }
+
+          if (jenis && item.jenisPengadaan !== jenis) {
+            return false;
+          }
+
+          return true;
+        });
+      }
+
+      // =====================================================
+      // DASHBOARD
+      // =====================================================
+
+      function renderDashboard() {
+        const data = getFilteredProcurement();
+
+        // ---------------------------------------------
+        // TOTAL
+        // ---------------------------------------------
+
+        document.getElementById("totalPaket").textContent = data.length;
+
+        // ---------------------------------------------
+        // TENDER
+        // ---------------------------------------------
+
+        const tender = data.filter((item) =>
+          String(item.metodePemilihan || "")
+            .toLowerCase()
+            .includes("tender"),
+        );
+
+        // ---------------------------------------------
+        // PL
+        // ---------------------------------------------
+
+        const pl = data.filter((item) =>
+          String(item.metodePemilihan || "")
+            .toLowerCase()
+            .includes("penunjukan"),
+        );
+
+        document.getElementById("totalTender").textContent = tender.length;
+
+        document.getElementById("totalPL").textContent = pl.length;
+
+        // ---------------------------------------------
+        // HPS
+        // ---------------------------------------------
+
+        const totalHPS = data.reduce((sum, item) => sum + parseNumber(item.nilaiHPS), 0);
+
+        document.getElementById("totalHPS").textContent = formatRupiah(totalHPS);
+
+        // ---------------------------------------------
+        // STATUS
+        // ---------------------------------------------
+
+        const sppbj = DATA.sppbj.filter((item) => matchesFilter(item));
+
+        const proses = DATA.prosesTender.filter((item) => matchesFilter(item));
+
+        const config = DATA.config.filter((item) => matchesFilter(item));
+
+        const kembali = DATA.kembali.filter((item) => matchesFilter(item));
+
+        document.getElementById("statusSPPBJ").textContent = sppbj.length;
+
+        document.getElementById("statusProses").textContent = proses.length;
+
+        document.getElementById("statusConfig").textContent = config.length;
+
+        document.getElementById("statusGagal").textContent = kembali.length;
+
+        // ---------------------------------------------
+        // TABLE
+        // ---------------------------------------------
+
+        renderDashboardTable(data);
+
+        // ---------------------------------------------
+        // CHART
+        // ---------------------------------------------
+
+        renderJenisChart(tender.length, pl.length);
+
+        renderStatusChart(sppbj.length, proses.length, config.length, kembali.length);
+      }
+
+      function matchesFilter(item) {
+        const bagian = document.getElementById("filterBagian").value;
+
+        const jenis = document.getElementById("filterJenis").value;
+
+        if (bagian && item.bagian !== bagian) {
+          return false;
+        }
+
+        if (jenis && item.jenisPengadaan !== jenis) {
+          return false;
+        }
+
+        return true;
+      }
+
+      // =====================================================
+      // TABLE DASHBOARD
+      // =====================================================
+
+      function renderDashboardTable(data) {
+        const tbody = document.getElementById("dashboardTable");
+
+        tbody.innerHTML = "";
+
+        document.getElementById("tableInfo").textContent = `${data.length} data`;
+
+        if (!data.length) {
+          tbody.innerHTML = `
+                <tr>
+                    <td
+                        colspan="8"
+                        class="px-4 py-10 text-center text-gray-500"
+                    >
+                        Tidak ada data.
+                    </td>
+                </tr>
+            `;
+
+          return;
+        }
+
+        data.slice(0, 200).forEach((item, index) => {
+          const tr = document.createElement("tr");
+
+          tr.className = "hover:bg-gray-50";
+
+          tr.innerHTML = `
+
+                    <td class="px-4 py-3">
+                        ${index + 1}
+                    </td>
+
+                    <td class="px-4 py-3 font-medium">
+                        ${escapeHTML(item.nomorPaket)}
+                    </td>
+
+                    <td class="px-4 py-3">
+                        ${escapeHTML(item.uraianPekerjaan)}
+                    </td>
+
+                    <td class="px-4 py-3">
+                        ${escapeHTML(item.bagian)}
+                    </td>
+
+                    <td class="px-4 py-3">
+                        ${escapeHTML(item.jenisPengadaan)}
+                    </td>
+
+                    <td class="px-4 py-3">
+                        ${escapeHTML(item.metodePemilihan)}
+                    </td>
+
+                    <td class="px-4 py-3 text-right">
+                        ${formatRupiah(item.nilaiHPS)}
+                    </td>
+
+                    <td class="px-4 py-3">
+                        ${escapeHTML(item.progress)}
+                    </td>
+
+                `;
+
+          tbody.appendChild(tr);
+        });
+      }
+
+      // =====================================================
+      // CHART JENIS
+      // =====================================================
+
+      function renderJenisChart(tender, pl) {
+        const canvas = document.getElementById("jenisChart");
+
+        if (jenisChart) {
+          jenisChart.destroy();
+        }
+
+        jenisChart = new Chart(canvas, {
+          type: "doughnut",
+
+          data: {
+            labels: ["Tender", "Penunjukan Langsung"],
+
+            datasets: [
+              {
+                data: [tender, pl],
+              },
+            ],
+          },
+
+          options: {
+            responsive: true,
+
+            maintainAspectRatio: false,
+
+            plugins: {
+              legend: {
+                position: "bottom",
+              },
+            },
+          },
+        });
+      }
+
+      // =====================================================
+      // CHART STATUS
+      // =====================================================
+
+      function renderStatusChart(sppbj, proses, config, kembali) {
+        const canvas = document.getElementById("statusChart");
+
+        if (statusChart) {
+          statusChart.destroy();
+        }
+
+        statusChart = new Chart(canvas, {
+          type: "bar",
+
+          data: {
+            labels: ["SPPBJ", "Proses Tender", "Config", "Kembali"],
+
+            datasets: [
+              {
+                label: "Jumlah Paket",
+
+                data: [sppbj, proses, config, kembali],
+              },
+            ],
+          },
+
+          options: {
+            responsive: true,
+
+            maintainAspectRatio: false,
+
+            scales: {
+              y: {
+                beginAtZero: true,
+              },
+            },
+
+            plugins: {
+              legend: {
+                display: false,
+              },
+            },
+          },
+        });
+      }
+
+      // =====================================================
+      // RUPA
+      // =====================================================
+
+      function renderRupa() {
+        const search = document.getElementById("rupaSearch").value.toLowerCase();
+
+        const bagian = document.getElementById("rupaBagian").value;
+
+        const data = DATA.rupa.filter((item) => {
+          const text = [item.nomorRupa, item.judulPekerjaan, item.bulan, item.tahun, item.jenisPengadaan, item.metodePemilihan, item.bagian].join(" ").toLowerCase();
+
+          if (search && !text.includes(search)) {
+            return false;
+          }
+
+          if (bagian && item.bagian !== bagian) {
+            return false;
+          }
+
+          return true;
+        });
+
+        const tbody = document.getElementById("rupaTable");
+
+        tbody.innerHTML = "";
+
+        if (!data.length) {
+          tbody.innerHTML = `
+                <tr>
+                    <td
+                        colspan="9"
+                        class="px-4 py-10 text-center text-gray-500"
+                    >
+                        Tidak ada data RUPA.
+                    </td>
+                </tr>
+            `;
+
+          return;
+        }
+
+        data.slice(0, 500).forEach((item, index) => {
+          const tr = document.createElement("tr");
+
+          tr.className = "hover:bg-gray-50";
+
+          tr.innerHTML = `
+
+                    <td class="px-4 py-3">
+                        ${index + 1}
+                    </td>
+
+                    <td class="px-4 py-3 font-medium">
+                        ${escapeHTML(item.nomorRupa)}
+                    </td>
+
+                    <td class="px-4 py-3">
+                        ${escapeHTML(item.judulPekerjaan)}
+                    </td>
+
+                    <td class="px-4 py-3">
+                        ${escapeHTML(item.bulan)}
+                    </td>
+
+                    <td class="px-4 py-3">
+                        ${escapeHTML(item.tahun)}
+                    </td>
+
+                    <td class="px-4 py-3">
+                        ${escapeHTML(item.jenisPengadaan)}
+                    </td>
+
+                    <td class="px-4 py-3 text-right">
+                        ${formatRupiah(item.estimasiNilai)}
+                    </td>
+
+                    <td class="px-4 py-3">
+                        ${escapeHTML(item.metodePemilihan)}
+                    </td>
+
+                    <td class="px-4 py-3">
+                        ${escapeHTML(item.bagian)}
+                    </td>
+
+                `;
+
+          tbody.appendChild(tr);
+        });
+      }
+
+      // =====================================================
+      // REPORT
+      // =====================================================
+
+      function renderReport() {
+        document.getElementById("reportSPPBJ").textContent = DATA.sppbj.length;
+
+        document.getElementById("reportTender").textContent = DATA.prosesTender.length;
+
+        document.getElementById("reportKembali").textContent = DATA.kembali.length;
+      }
+
+      // =====================================================
+      // NAVIGATION
+      // =====================================================
+
+      function showPage(page) {
+        document.querySelectorAll(".page").forEach((section) => {
+          section.classList.add("hidden");
+        });
+
+        document.getElementById(`page-${page}`).classList.remove("hidden");
+
+        document.querySelectorAll(".sidebar-item").forEach((item) => {
+          item.classList.remove("active");
+        });
+
+        document.getElementById(`nav-${page}`).classList.add("active");
+
+        const titles = {
+          dashboard: ["Dashboard", "Monitoring Pengadaan 2026"],
+
+          rupa: ["Rupa", "Rencana Umum Pengadaan"],
+
+          report: ["Report", "Laporan Monitoring Pengadaan"],
+
+          efisiensi: ["Efisiensi", "Analisis Efisiensi Pengadaan"],
+        };
+
+        document.getElementById("pageTitle").textContent = titles[page][0];
+
+        document.getElementById("pageSubtitle").textContent = titles[page][1];
+      }
+
+      // =====================================================
+      // EXPORT DASHBOARD
+      // =====================================================
+
+      function exportDashboard() {
+        const data = getFilteredProcurement().map((item, index) => ({
+          No: index + 1,
+
+          "No. Paket": item.nomorPaket,
+
+          "Uraian Pekerjaan": item.uraianPekerjaan,
+
+          Bagian: item.bagian,
+
+          "Nilai HPS": parseNumber(item.nilaiHPS),
+
+          "Jenis Pengadaan": item.jenisPengadaan,
+
+          "Metode Pemilihan": item.metodePemilihan,
+
+          Vendor: item.vendor,
+
+          Progress: item.progress,
+
+          PIC: item.pic,
+
+          "No RUP": item.noRup,
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(data);
+
+        const workbook = XLSX.utils.book_new();
+
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Dashboard");
+
+        XLSX.writeFile(workbook, "Monitoring_Pengadaan_2026.xlsx");
+      }
+
+      // =====================================================
+      // EXPORT RUPA
+      // =====================================================
+
+      function exportRupa() {
+        const data = DATA.rupa.map((item, index) => ({
+          No: index + 1,
+
+          "Nomor RUPA": item.nomorRupa,
+
+          "Judul Pekerjaan": item.judulPekerjaan,
+
+          Bulan: item.bulan,
+
+          Tahun: item.tahun,
+
+          "Jenis Pengadaan": item.jenisPengadaan,
+
+          "Estimasi Nilai": parseNumber(item.estimasiNilai),
+
+          "Metode Pemilihan": item.metodePemilihan,
+
+          "Rencana Capaian": item.rencanaCapaian,
+
+          "Sumber Anggaran": item.sumberAnggaran,
+
+          Keterangan: item.keterangan,
+
+          Bagian: item.bagian,
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(data);
+
+        const workbook = XLSX.utils.book_new();
+
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Rupa");
+
+        XLSX.writeFile(workbook, "RUPA_2026.xlsx");
+      }
+
+      // =====================================================
+      // EXPORT REPORT
+      // =====================================================
+
+      function exportReport() {
+        const rows = [
+          {
+            Kategori: "SPPBJ",
+            Jumlah: DATA.sppbj.length,
+          },
+
+          {
+            Kategori: "Proses Tender",
+            Jumlah: DATA.prosesTender.length,
+          },
+
+          {
+            Kategori: "Config",
+            Jumlah: DATA.config.length,
+          },
+
+          {
+            Kategori: "Kembali",
+            Jumlah: DATA.kembali.length,
+          },
+        ];
+
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+
+        const workbook = XLSX.utils.book_new();
+
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
+
+        XLSX.writeFile(workbook, "Report_Pengadaan_2026.xlsx");
+      }
+
+      // =====================================================
+      // SYSTEM MESSAGE
+      // =====================================================
+
+      function showSystemMessage(title, text, detail = "") {
+        document.getElementById("systemTitle").textContent = title;
+
+        document.getElementById("systemText").textContent = text;
+
+        const detailElement = document.getElementById("systemDetail");
+
+        if (detail) {
+          detailElement.textContent = detail;
+
+          detailElement.classList.remove("hidden");
+        } else {
+          detailElement.classList.add("hidden");
+        }
+
+        document.getElementById("systemMessage").classList.remove("hidden");
+      }
+
+      function hideSystemMessage() {
+        document.getElementById("systemMessage").classList.add("hidden");
+      }
+
+      // =====================================================
+      // START
+      // =====================================================
+
+      document.addEventListener("DOMContentLoaded", () => {
+        loadData();
+      });
+    </script>
+  </body>
+</html>

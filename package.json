@@ -1,0 +1,10 @@
+{
+  "name": "monitoring-pengadaan",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@netlify/identity": "^1.0.0",
+    "googleapis": "^180.0.0"
+  }
+}
