@@ -1,5 +1,4 @@
 import { google } from "googleapis";
-// import { getUser } from "@netlify/identity";
 
 // ======================================================
 // KONFIGURASI GOOGLE SHEETS
@@ -9,31 +8,31 @@ const SHEETS = {
   sppbj: {
     name: "SPPBJ",
     range: "A:U",
-    headerIndex: 3,
+    headerIndex: 3, // Baris 4
   },
 
   prosesTender: {
     name: "Proses Tender",
     range: "A:U",
-    headerIndex: 3,
+    headerIndex: 3, // Baris 4
   },
 
   config: {
     name: "Config",
     range: "A:U",
-    headerIndex: 3,
+    headerIndex: 3, // Baris 4
   },
 
   kembali: {
     name: "Kembali",
     range: "A:U",
-    headerIndex: 3,
+    headerIndex: 3, // Baris 4
   },
 
   rupa: {
     name: "Rupa",
     range: "A:L",
-    headerIndex: 0,
+    headerIndex: 0, // Baris 1
   },
 };
 
@@ -43,36 +42,55 @@ const SHEETS = {
 
 function getGoogleAuth() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-
   const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
-
-  // ------------------------------------------
-  // CHECK EMAIL
-  // ------------------------------------------
 
   if (!email) {
     throw new Error("Environment Variable GOOGLE_SERVICE_ACCOUNT_EMAIL belum tersedia.");
   }
 
-  // ------------------------------------------
-  // CHECK PRIVATE KEY
-  // ------------------------------------------
-
   if (!privateKey) {
     throw new Error("Environment Variable GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY belum tersedia.");
   }
 
-  // ------------------------------------------
-  // CREATE JWT
-  // ------------------------------------------
-
   return new google.auth.JWT({
-    email: email,
-
+    email,
     key: privateKey.replace(/\\n/g, "\n"),
-
     scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
   });
+}
+
+// ======================================================
+// NORMALIZE HEADER
+// ======================================================
+
+function normalizeHeader(value) {
+  return String(value ?? "")
+    .replace(/\u00A0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+// ======================================================
+// GET FIELD DENGAN BEBERAPA ALIAS
+// ======================================================
+
+function getField(row, aliases) {
+  const keys = Object.keys(row);
+
+  for (const alias of aliases) {
+    const normalizedAlias = normalizeHeader(alias);
+
+    const foundKey = keys.find((key) => {
+      return normalizeHeader(key) === normalizedAlias;
+    });
+
+    if (foundKey !== undefined) {
+      return row[foundKey] ?? "";
+    }
+  }
+
+  return "";
 }
 
 // ======================================================
@@ -80,23 +98,14 @@ function getGoogleAuth() {
 // ======================================================
 
 async function readSheet(sheetsApi, sheetName, range, headerIndex) {
+  console.log("------------------------------------------");
   console.log(`Membaca Sheet: ${sheetName}`);
-
   console.log(`Range: ${range}`);
-
   console.log(`Header Index: ${headerIndex}`);
-
-  console.log(`Header ${sheetName}:`, headers);
-
-  // ------------------------------------------
-  // REQUEST GOOGLE SHEETS
-  // ------------------------------------------
 
   const response = await sheetsApi.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-
     range: `${sheetName}!${range}`,
-
     valueRenderOption: "FORMATTED_VALUE",
   });
 
@@ -104,40 +113,30 @@ async function readSheet(sheetsApi, sheetName, range, headerIndex) {
 
   console.log(`Sheet ${sheetName}: ${rows.length} baris diterima`);
 
-  // ------------------------------------------
-  // CHECK DATA
-  // ------------------------------------------
-
   if (rows.length <= headerIndex) {
     console.log(`Sheet ${sheetName} tidak mempunyai data yang cukup.`);
 
     return [];
   }
 
-  // ------------------------------------------
+  // --------------------------------------------------
   // HEADER
-  // ------------------------------------------
+  // --------------------------------------------------
 
   const headers = rows[headerIndex].map((header) => String(header || "").trim());
 
   console.log(`Header ${sheetName}:`, headers);
 
-  // ------------------------------------------
+  // --------------------------------------------------
   // DATA
-  // ------------------------------------------
+  // --------------------------------------------------
 
   const dataRows = rows.slice(headerIndex + 1);
 
-  // ------------------------------------------
-  // CONVERT ROW → OBJECT
-  // ------------------------------------------
-
   const result = dataRows
-
     .filter((row) => {
       return row.some((value) => String(value || "").trim() !== "");
     })
-
     .map((row, index) => {
       const obj = {
         _row: headerIndex + index + 2,
@@ -156,32 +155,20 @@ async function readSheet(sheetsApi, sheetName, range, headerIndex) {
 
   console.log(`Sheet ${sheetName}: ${result.length} data valid`);
 
+  // --------------------------------------------------
+  // DEBUG SAMPLE
+  // --------------------------------------------------
+
+  if (result.length > 0) {
+    console.log(`Contoh data ${sheetName}:`, result[0]);
+  }
+
   return result;
 }
 
 // ======================================================
 // NORMALIZE PROCUREMENT
 // ======================================================
-
-function getField(row, aliases) {
-  const keys = Object.keys(row);
-
-  for (const alias of aliases) {
-    const normalizedAlias = String(alias).toLowerCase().replace(/\s+/g, " ").trim();
-
-    const foundKey = keys.find((key) => {
-      const normalizedKey = String(key).toLowerCase().replace(/\s+/g, " ").trim();
-
-      return normalizedKey === normalizedAlias;
-    });
-
-    if (foundKey !== undefined) {
-      return row[foundKey] ?? "";
-    }
-  }
-
-  return "";
-}
 
 function normalizeProcurement(rows, source) {
   return rows.map((row) => ({
@@ -229,69 +216,38 @@ function normalizeProcurement(rows, source) {
   }));
 }
 
+// ======================================================
+// NORMALIZE RUPA
+// ======================================================
+
 function normalizeRupa(rows) {
-    return rows.map((row) => ({
-        no: getField(row, [
-            "NO",
-            "No",
-        ]),
+  return rows.map((row) => ({
+    no: getField(row, ["NO", "No"]),
 
-        nomorRupa: getField(row, [
-            "Nomor RUPA",
-            "No RUPA",
-            "No. RUPA",
-        ]),
+    nomorRupa: getField(row, ["Nomor RUPA", "No RUPA", "No. RUPA"]),
 
-        judulPekerjaan: getField(row, [
-            "Judul Pekerjaan",
-            "Uraian Pekerjaan",
-        ]),
+    judulPekerjaan: getField(row, ["Judul Pekerjaan", "Uraian Pekerjaan"]),
 
-        bulan: getField(row, [
-            "Rencana Waktu Pelaksanaan — Bulan",
-            "Rencana Waktu Pelaksanaan - Bulan",
-            "Rencana Waktu Pelaksanaan – Bulan",
-            "Rencana Waktu Pelaksanaan",
-            "Bulan",
-        ]),
+    bulan: getField(row, ["Rencana Waktu Pelaksanaan — Bulan", "Rencana Waktu Pelaksanaan - Bulan", "Rencana Waktu Pelaksanaan – Bulan", "Rencana Waktu Pelaksanaan", "Bulan"]),
 
-        tahun: getField(row, [
-            "Tahun",
-        ]),
+    tahun: getField(row, ["Tahun"]),
 
-        jenisPengadaan: getField(row, [
-            "Jenis Pengadaan",
-            "Jenis",
-        ]),
+    jenisPengadaan: getField(row, ["Jenis Pengadaan", "Jenis"]),
 
-        estimasiNilai: getField(row, [
-            "Estimasi Nilai Pekerjaan",
-            "Estimasi Nilai",
-        ]),
+    estimasiNilai: getField(row, ["Estimasi Nilai Pekerjaan", "Estimasi Nilai"]),
 
-        metodePemilihan: getField(row, [
-            "Metode Pemilihan yang digunakan",
-            "Metode Pemilihan Yang digunakan",
-            "Metode Pemilihan",
-        ]),
+    metodePemilihan: getField(row, ["Metode Pemilihan yang digunakan", "Metode Pemilihan Yang digunakan", "Metode Pemilihan"]),
 
-        rencanaCapaian: getField(row, [
-            "Rencana Capaian Produk",
-        ]),
+    rencanaCapaian: getField(row, ["Rencana Capaian Produk"]),
 
-        sumberAnggaran: getField(row, [
-            "Sumber Anggaran",
-        ]),
+    sumberAnggaran: getField(row, ["Sumber Anggaran"]),
 
-        keterangan: getField(row, [
-            "Keterangan",
-        ]),
+    keterangan: getField(row, ["Keterangan"]),
 
-        bagian: getField(row, [
-            "Bagian",
-        ]),
-    }));
+    bagian: getField(row, ["Bagian"]),
+  }));
 }
+
 // ======================================================
 // MAIN NETLIFY FUNCTION
 // ======================================================
@@ -299,14 +255,12 @@ function normalizeRupa(rows) {
 export default async () => {
   try {
     console.log("==========================================");
-
     console.log("GET-DATA FUNCTION START");
-
     console.log("==========================================");
 
-    // ==================================================
-    // 1. CHECK ENVIRONMENT VARIABLES
-    // ==================================================
+    // --------------------------------------------------
+    // CHECK ENVIRONMENT VARIABLES
+    // --------------------------------------------------
 
     console.log("GOOGLE_SHEET_ID:", process.env.GOOGLE_SHEET_ID ? "TERSEDIA" : "TIDAK TERSEDIA");
 
@@ -318,37 +272,9 @@ export default async () => {
       throw new Error("GOOGLE_SHEET_ID belum dikonfigurasi.");
     }
 
-    // ==================================================
-    // 2. CHECK USER LOGIN
-    // ==================================================
-
-    // const user = await getUser();
-
-    // console.log("User:", user ? user.email : "TIDAK LOGIN");
-
-    // if (!user) {
-    //   return new Response(
-    //     JSON.stringify({
-    //       success: false,
-
-    //       error: "Unauthorized",
-
-    //       message: "User belum login ke Netlify Identity.",
-    //     }),
-
-    //     {
-    //       status: 401,
-
-    //       headers: {
-    //         "Content-Type": "application/json",
-    //       },
-    //     },
-    //   );
-    // }
-
-    // ==================================================
-    // 3. CREATE GOOGLE AUTH
-    // ==================================================
+    // --------------------------------------------------
+    // GOOGLE AUTH
+    // --------------------------------------------------
 
     console.log("Membuat Google Authentication...");
 
@@ -356,105 +282,36 @@ export default async () => {
 
     console.log("Google Authentication berhasil.");
 
-    // ==================================================
-    // 4. CREATE SHEETS API
-    // ==================================================
+    // --------------------------------------------------
+    // GOOGLE SHEETS API
+    // --------------------------------------------------
 
     const sheets = google.sheets({
       version: "v4",
-
       auth,
     });
 
     console.log("Google Sheets API berhasil dibuat.");
 
-    // ==================================================
-    // 5. TEST AUTHENTICATION
-    // ==================================================
-
-    console.log("Melakukan koneksi ke Google Sheets...");
-
-    /*
-     * Kita membaca kelima sheet secara paralel.
-     * Jika salah satu gagal, error akan ditampilkan
-     * pada log Netlify.
-     */
+    // --------------------------------------------------
+    // READ ALL SHEETS
+    // --------------------------------------------------
 
     const [sppbjRows, prosesTenderRows, configRows, kembaliRows, rupaRows] = await Promise.all([
-      // ------------------------------------------
-      // SPPBJ
-      // ------------------------------------------
+      readSheet(sheets, SHEETS.sppbj.name, SHEETS.sppbj.range, SHEETS.sppbj.headerIndex),
 
-      readSheet(
-        sheets,
+      readSheet(sheets, SHEETS.prosesTender.name, SHEETS.prosesTender.range, SHEETS.prosesTender.headerIndex),
 
-        SHEETS.sppbj.name,
+      readSheet(sheets, SHEETS.config.name, SHEETS.config.range, SHEETS.config.headerIndex),
 
-        SHEETS.sppbj.range,
+      readSheet(sheets, SHEETS.kembali.name, SHEETS.kembali.range, SHEETS.kembali.headerIndex),
 
-        SHEETS.sppbj.headerIndex,
-      ),
-
-      // ------------------------------------------
-      // PROSES TENDER
-      // ------------------------------------------
-
-      readSheet(
-        sheets,
-
-        SHEETS.prosesTender.name,
-
-        SHEETS.prosesTender.range,
-
-        SHEETS.prosesTender.headerIndex,
-      ),
-
-      // ------------------------------------------
-      // CONFIG
-      // ------------------------------------------
-
-      readSheet(
-        sheets,
-
-        SHEETS.config.name,
-
-        SHEETS.config.range,
-
-        SHEETS.config.headerIndex,
-      ),
-
-      // ------------------------------------------
-      // KEMBALI
-      // ------------------------------------------
-
-      readSheet(
-        sheets,
-
-        SHEETS.kembali.name,
-
-        SHEETS.kembali.range,
-
-        SHEETS.kembali.headerIndex,
-      ),
-
-      // ------------------------------------------
-      // RUPA
-      // ------------------------------------------
-
-      readSheet(
-        sheets,
-
-        SHEETS.rupa.name,
-
-        SHEETS.rupa.range,
-
-        SHEETS.rupa.headerIndex,
-      ),
+      readSheet(sheets, SHEETS.rupa.name, SHEETS.rupa.range, SHEETS.rupa.headerIndex),
     ]);
 
-    // ==================================================
-    // 6. NORMALIZE DATA
-    // ==================================================
+    // --------------------------------------------------
+    // NORMALIZE
+    // --------------------------------------------------
 
     console.log("Melakukan normalisasi data...");
 
@@ -470,55 +327,38 @@ export default async () => {
       rupa: normalizeRupa(rupaRows),
     };
 
-    // ==================================================
-    // 7. LOG TOTAL DATA
-    // ==================================================
+    // --------------------------------------------------
+    // LOG RESULT
+    // --------------------------------------------------
 
     console.log("==========================================");
-
     console.log("HASIL PENGAMBILAN DATA");
-
     console.log("SPPBJ:", data.sppbj.length);
-
     console.log("Proses Tender:", data.prosesTender.length);
-
     console.log("Config:", data.config.length);
-
     console.log("Kembali:", data.kembali.length);
-
     console.log("Rupa:", data.rupa.length);
-
     console.log("==========================================");
 
-    // ==================================================
-    // 8. SUCCESS RESPONSE
-    // ==================================================
+    // --------------------------------------------------
+    // SUCCESS RESPONSE
+    // --------------------------------------------------
 
     return new Response(
       JSON.stringify({
         success: true,
 
-        // user: {
-        //   email: user.email,
-        // },
-
-        data: data,
+        data,
 
         meta: {
           sppbj: data.sppbj.length,
-
           prosesTender: data.prosesTender.length,
-
           config: data.config.length,
-
           kembali: data.kembali.length,
-
           rupa: data.rupa.length,
-
           fetchedAt: new Date().toISOString(),
         },
       }),
-
       {
         status: 200,
 
@@ -530,10 +370,6 @@ export default async () => {
       },
     );
   } catch (error) {
-    // ==================================================
-    // ERROR HANDLING
-    // ==================================================
-
     console.error("==========================================");
 
     console.error("GET-DATA FUNCTION ERROR");
@@ -560,7 +396,6 @@ export default async () => {
 
         message: error?.message || "Terjadi kesalahan pada server.",
       }),
-
       {
         status: 500,
 

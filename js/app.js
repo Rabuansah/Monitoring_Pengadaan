@@ -1,6 +1,6 @@
-/* =========================================================
-   GLOBAL STATE
-   ========================================================= */
+// ======================================================
+// GLOBAL STATE
+// ======================================================
 
 const STATE = {
   data: {
@@ -21,17 +21,17 @@ const STATE = {
   currentPage: "dashboard",
 };
 
-/* =========================================================
-   DOM HELPER
-   ========================================================= */
+// ======================================================
+// DOM HELPER
+// ======================================================
 
 function $(selector) {
   return document.querySelector(selector);
 }
 
-/* =========================================================
-   INITIALIZATION
-   ========================================================= */
+// ======================================================
+// INITIALIZATION
+// ======================================================
 
 document.addEventListener("DOMContentLoaded", () => {
   initializeEvents();
@@ -43,9 +43,9 @@ document.addEventListener("DOMContentLoaded", () => {
   loadData();
 });
 
-/* =========================================================
-   EVENTS
-   ========================================================= */
+// ======================================================
+// EVENTS
+// ======================================================
 
 function initializeEvents() {
   // Retry
@@ -74,24 +74,25 @@ function initializeEvents() {
 
   $("#sidebarOverlay")?.addEventListener("click", closeSidebar);
 
-  // Export
+  // Export Dashboard
   $("#exportDashboardButton")?.addEventListener("click", exportDashboard);
 
+  // Export Rupa
   $("#exportRupaButton")?.addEventListener("click", exportRupa);
 }
 
-/* =========================================================
-   LOAD DATA
-   ========================================================= */
+// ======================================================
+// LOAD DATA
+// ======================================================
 
 async function loadData() {
   showLoading();
 
   try {
+    console.log("Mengambil data dari Netlify Function...");
+
     const response = await fetch("/.netlify/functions/get-data", {
       method: "GET",
-
-      credentials: "include",
 
       cache: "no-store",
 
@@ -100,21 +101,85 @@ async function loadData() {
       },
     });
 
+    console.log("HTTP Status:", response.status);
+
+    // --------------------------------------------------
+    // FUNCTION NOT FOUND
+    // --------------------------------------------------
+
     if (response.status === 404) {
-      throw new Error("Function get-data tidak ditemukan. Periksa folder netlify/functions dan konfigurasi Netlify.");
+      throw new Error("Function get-data tidak ditemukan. Periksa folder netlify/functions dan deployment Netlify.");
     }
+
+    // --------------------------------------------------
+    // READ RESPONSE
+    // --------------------------------------------------
 
     const result = await response.json();
 
+    console.log("Response get-data:", result);
+
+    // --------------------------------------------------
+    // HTTP ERROR
+    // --------------------------------------------------
+
     if (!response.ok) {
-      throw new Error(result.message || `Server mengembalikan HTTP ${response.status}.`);
+      throw new Error(result?.message || `Server mengembalikan HTTP ${response.status}.`);
     }
+
+    // --------------------------------------------------
+    // INVALID RESPONSE
+    // --------------------------------------------------
 
     if (!result.success) {
-      throw new Error(result.message || "Server tidak mengembalikan data yang valid.");
+      throw new Error(result?.message || "Server tidak mengembalikan data yang valid.");
     }
 
+    // --------------------------------------------------
+    // NORMALIZE
+    // --------------------------------------------------
+
     STATE.data = normalizeResponseData(result.data);
+
+    // --------------------------------------------------
+    // DEBUG DATA COUNT
+    // --------------------------------------------------
+
+    console.log("=================================");
+
+    console.log("DATA BERHASIL DITERIMA");
+
+    console.log("SPPBJ:", STATE.data.sppbj.length);
+
+    console.log("Proses Tender:", STATE.data.prosesTender.length);
+
+    console.log("Config:", STATE.data.config.length);
+
+    console.log("Kembali:", STATE.data.kembali.length);
+
+    console.log("Rupa:", STATE.data.rupa.length);
+
+    console.log("=================================");
+
+    // --------------------------------------------------
+    // SAMPLE DATA
+    // --------------------------------------------------
+
+    if (STATE.data.sppbj.length > 0) {
+      console.log("Contoh data SPPBJ:", STATE.data.sppbj[0]);
+    }
+
+    if (STATE.data.prosesTender.length > 0) {
+      console.log("Contoh data Proses Tender:", STATE.data.prosesTender[0]);
+    }
+
+    if (STATE.data.rupa.length > 0) {
+      console.log("Contoh data Rupa:", STATE.data.rupa[0]);
+    }
+
+    // --------------------------------------------------
+    // UPDATE UI
+    // --------------------------------------------------
 
     updateLastUpdate(result.meta?.fetchedAt);
 
@@ -130,13 +195,13 @@ async function loadData() {
   } catch (error) {
     console.error("LOAD DATA ERROR:", error);
 
-    showError(error.message || "Terjadi kesalahan saat mengambil data.");
+    showError(error?.message || "Terjadi kesalahan saat mengambil data.");
   }
 }
 
-/* =========================================================
-   NORMALIZE RESPONSE
-   ========================================================= */
+// ======================================================
+// NORMALIZE RESPONSE
+// ======================================================
 
 function normalizeResponseData(data) {
   return {
@@ -152,19 +217,17 @@ function normalizeResponseData(data) {
   };
 }
 
-/* =========================================================
-   GET ALL PROCUREMENT DATA
-   ========================================================= */
+// ======================================================
+// GET ALL PROCUREMENT DATA
+// ======================================================
 
 function getAllProcurement() {
-  const sources = [...STATE.data.sppbj, ...STATE.data.prosesTender, ...STATE.data.config, ...STATE.data.kembali];
-
-  return sources;
+  return [...STATE.data.sppbj, ...STATE.data.prosesTender, ...STATE.data.config, ...STATE.data.kembali];
 }
 
-/* =========================================================
-   FILTER OPTIONS
-   ========================================================= */
+// ======================================================
+// FILTER OPTIONS
+// ======================================================
 
 function populateFilters() {
   const procurement = getAllProcurement();
@@ -190,6 +253,10 @@ function populateFilters() {
   const bagianSelect = $("#filterBagian");
 
   const jenisSelect = $("#filterJenis");
+
+  if (!bagianSelect || !jenisSelect) {
+    return;
+  }
 
   const currentBagian = bagianSelect.value;
 
@@ -224,14 +291,14 @@ function populateFilters() {
   jenisSelect.value = currentJenis;
 }
 
-/* =========================================================
-   APPLY FILTER
-   ========================================================= */
+// ======================================================
+// APPLY FILTER
+// ======================================================
 
 function applyFilters() {
-  const bagian = $("#filterBagian").value;
+  const bagian = $("#filterBagian")?.value || "";
 
-  const jenis = $("#filterJenis").value;
+  const jenis = $("#filterJenis")?.value || "";
 
   let data = getAllProcurement();
 
@@ -248,9 +315,9 @@ function applyFilters() {
   renderDashboard();
 }
 
-/* =========================================================
-   DASHBOARD
-   ========================================================= */
+// ======================================================
+// DASHBOARD
+// ======================================================
 
 function renderDashboard() {
   const data = STATE.filteredProcurement;
@@ -266,9 +333,9 @@ function renderDashboard() {
   updateTableSummary(data.length);
 }
 
-/* =========================================================
-   SCORECARDS
-   ========================================================= */
+// ======================================================
+// SCORECARDS
+// ======================================================
 
 function updateScorecards(data) {
   const total = data.length;
@@ -304,9 +371,9 @@ function updateScorecards(data) {
   setText("#totalRupa", formatNumber(rupa));
 }
 
-/* =========================================================
-   PROCUREMENT TYPE
-   ========================================================= */
+// ======================================================
+// PROCUREMENT TYPE
+// ======================================================
 
 function isTender(value) {
   return String(value || "")
@@ -320,9 +387,9 @@ function isPL(value) {
   return text.includes("penunjukan langsung") || text === "pl";
 }
 
-/* =========================================================
-   FAILED / RETURNED
-   ========================================================= */
+// ======================================================
+// FAILED / RETURNED
+// ======================================================
 
 function isFailedOrReturned(value) {
   const text = String(value || "").toLowerCase();
@@ -330,17 +397,24 @@ function isFailedOrReturned(value) {
   return text.includes("gagal") || text.includes("kembali") || text.includes("dikembalikan");
 }
 
-/* =========================================================
-   DASHBOARD TABLE
-   ========================================================= */
+// ======================================================
+// DASHBOARD TABLE
+// ======================================================
 
 function renderDashboardTable(data) {
   const tbody = $("#dashboardTableBody");
 
+  if (!tbody) {
+    return;
+  }
+
   if (!data.length) {
     tbody.innerHTML = `
             <tr>
-                <td colspan="8" class="empty-table">
+                <td
+                    colspan="8"
+                    class="empty-table"
+                >
                     Tidak ada data yang sesuai dengan filter.
                 </td>
             </tr>
@@ -361,15 +435,21 @@ function renderDashboardTable(data) {
                             ${index + 1}
                         </td>
 
-                        <td class="font-semibold text-slate-700">
+                        <td
+                            class="font-semibold text-slate-700"
+                        >
                             ${escapeHtml(item.nomorPaket || "-")}
                         </td>
 
                         <td>
-                            <div class="max-w-xs truncate"
-                                 title="${escapeAttribute(item.uraianPekerjaan || "")}">
+
+                            <div
+                                class="max-w-xs truncate"
+                                title="${escapeAttribute(item.uraianPekerjaan || "")}"
+                            >
                                 ${escapeHtml(item.uraianPekerjaan || "-")}
                             </div>
+
                         </td>
 
                         <td>
@@ -384,7 +464,9 @@ function renderDashboardTable(data) {
                             ${escapeHtml(item.metodePemilihan || "-")}
                         </td>
 
-                        <td class="whitespace-nowrap">
+                        <td
+                            class="whitespace-nowrap"
+                        >
                             ${formatRupiah(item.nilaiHPS)}
                         </td>
 
@@ -398,9 +480,9 @@ function renderDashboardTable(data) {
     .join("");
 }
 
-/* =========================================================
-   STATUS BADGE
-   ========================================================= */
+// ======================================================
+// STATUS BADGE
+// ======================================================
 
 function createStatusBadge(status) {
   const value = String(status || "-").trim();
@@ -422,20 +504,22 @@ function createStatusBadge(status) {
   }
 
   return `
-        <span class="status-badge ${classes}">
+        <span
+            class="status-badge ${classes}"
+        >
             ${escapeHtml(value)}
         </span>
     `;
 }
 
-/* =========================================================
-   PROCUREMENT CHART
-   ========================================================= */
+// ======================================================
+// PROCUREMENT CHART
+// ======================================================
 
 function renderProcurementChart(data) {
   const canvas = $("#procurementChart");
 
-  if (!canvas) {
+  if (!canvas || typeof Chart === "undefined") {
     return;
   }
 
@@ -445,6 +529,8 @@ function renderProcurementChart(data) {
 
   if (STATE.charts.procurement) {
     STATE.charts.procurement.destroy();
+
+    STATE.charts.procurement = null;
   }
 
   STATE.charts.procurement = new Chart(canvas, {
@@ -478,14 +564,14 @@ function renderProcurementChart(data) {
   });
 }
 
-/* =========================================================
-   STATUS CHART
-   ========================================================= */
+// ======================================================
+// STATUS CHART
+// ======================================================
 
 function renderStatusChart(data) {
   const canvas = $("#statusChart");
 
-  if (!canvas) {
+  if (!canvas || typeof Chart === "undefined") {
     return;
   }
 
@@ -503,6 +589,8 @@ function renderStatusChart(data) {
 
   if (STATE.charts.status) {
     STATE.charts.status.destroy();
+
+    STATE.charts.status = null;
   }
 
   STATE.charts.status = new Chart(canvas, {
@@ -554,19 +642,26 @@ function renderStatusChart(data) {
   });
 }
 
-/* =========================================================
-   RUPA
-   ========================================================= */
+// ======================================================
+// RUPA
+// ======================================================
 
 function renderRupa() {
   const tbody = $("#rupaTableBody");
+
+  if (!tbody) {
+    return;
+  }
 
   const data = STATE.data.rupa;
 
   if (!data.length) {
     tbody.innerHTML = `
             <tr>
-                <td colspan="9" class="empty-table">
+                <td
+                    colspan="9"
+                    class="empty-table"
+                >
                     Tidak ada data Rupa.
                 </td>
             </tr>
@@ -584,15 +679,21 @@ function renderRupa() {
                             ${index + 1}
                         </td>
 
-                        <td class="font-semibold text-slate-700">
+                        <td
+                            class="font-semibold text-slate-700"
+                        >
                             ${escapeHtml(item.nomorRupa || "-")}
                         </td>
 
                         <td>
-                            <div class="max-w-sm truncate"
-                                 title="${escapeAttribute(item.judulPekerjaan || "")}">
+
+                            <div
+                                class="max-w-sm truncate"
+                                title="${escapeAttribute(item.judulPekerjaan || "")}"
+                            >
                                 ${escapeHtml(item.judulPekerjaan || "-")}
                             </div>
+
                         </td>
 
                         <td>
@@ -607,7 +708,9 @@ function renderRupa() {
                             ${escapeHtml(item.jenisPengadaan || "-")}
                         </td>
 
-                        <td class="whitespace-nowrap">
+                        <td
+                            class="whitespace-nowrap"
+                        >
                             ${formatRupiah(item.estimasiNilai)}
                         </td>
 
@@ -625,9 +728,9 @@ function renderRupa() {
     .join("");
 }
 
-/* =========================================================
-   REPORT
-   ========================================================= */
+// ======================================================
+// REPORT
+// ======================================================
 
 function renderReports() {
   renderReportBagian();
@@ -635,12 +738,16 @@ function renderReports() {
   renderReportJenis();
 }
 
-/* =========================================================
-   REPORT - BAGIAN
-   ========================================================= */
+// ======================================================
+// REPORT - BAGIAN
+// ======================================================
 
 function renderReportBagian() {
   const tbody = $("#reportBagianBody");
+
+  if (!tbody) {
+    return;
+  }
 
   const map = new Map();
 
@@ -657,7 +764,9 @@ function renderReportBagian() {
       return `
                     <tr>
 
-                        <td class="font-medium text-slate-700">
+                        <td
+                            class="font-medium text-slate-700"
+                        >
                             ${escapeHtml(item[0])}
                         </td>
 
@@ -671,12 +780,16 @@ function renderReportBagian() {
     .join("");
 }
 
-/* =========================================================
-   REPORT - JENIS
-   ========================================================= */
+// ======================================================
+// REPORT - JENIS
+// ======================================================
 
 function renderReportJenis() {
   const tbody = $("#reportJenisBody");
+
+  if (!tbody) {
+    return;
+  }
 
   const map = new Map();
 
@@ -693,7 +806,9 @@ function renderReportJenis() {
       return `
                     <tr>
 
-                        <td class="font-medium text-slate-700">
+                        <td
+                            class="font-medium text-slate-700"
+                        >
                             ${escapeHtml(item[0])}
                         </td>
 
@@ -707,29 +822,33 @@ function renderReportJenis() {
     .join("");
 }
 
-/* =========================================================
-   NAVIGATION
-   ========================================================= */
+// ======================================================
+// NAVIGATION
+// ======================================================
 
 function navigateTo(page) {
   const titles = {
     dashboard: {
       title: "Dashboard",
+
       subtitle: "Monitoring Pengadaan Tahun 2026",
     },
 
     rupa: {
       title: "Rupa",
+
       subtitle: "Rencana Umum Pengadaan",
     },
 
     report: {
       title: "Report",
+
       subtitle: "Rekapitulasi data pengadaan",
     },
 
     efisiensi: {
       title: "Efisiensi",
+
       subtitle: "Analisis efisiensi anggaran",
     },
   };
@@ -759,9 +878,9 @@ function navigateTo(page) {
   closeSidebar();
 }
 
-/* =========================================================
-   MOBILE SIDEBAR
-   ========================================================= */
+// ======================================================
+// MOBILE SIDEBAR
+// ======================================================
 
 function openSidebar() {
   $("#sidebar")?.classList.remove("-translate-x-full");
@@ -775,9 +894,9 @@ function closeSidebar() {
   $("#sidebarOverlay")?.classList.add("hidden");
 }
 
-/* =========================================================
-   EXPORT DASHBOARD
-   ========================================================= */
+// ======================================================
+// EXPORT DASHBOARD
+// ======================================================
 
 function exportDashboard() {
   const data = STATE.filteredProcurement;
@@ -823,9 +942,9 @@ function exportDashboard() {
   downloadExcel(exportData, "Monitoring_Pengadaan_2026.xlsx", "Dashboard");
 }
 
-/* =========================================================
-   EXPORT RUPA
-   ========================================================= */
+// ======================================================
+// EXPORT RUPA
+// ======================================================
 
 function exportRupa() {
   const data = STATE.data.rupa;
@@ -867,9 +986,9 @@ function exportRupa() {
   downloadExcel(exportData, "Rupa_2026.xlsx", "Rupa");
 }
 
-/* =========================================================
-   EXCEL HELPER
-   ========================================================= */
+// ======================================================
+// EXCEL HELPER
+// ======================================================
 
 function downloadExcel(data, filename, sheetName) {
   if (typeof XLSX === "undefined") {
@@ -887,9 +1006,9 @@ function downloadExcel(data, filename, sheetName) {
   XLSX.writeFile(workbook, filename);
 }
 
-/* =========================================================
-   UI STATE
-   ========================================================= */
+// ======================================================
+// UI STATE
+// ======================================================
 
 function showLoading() {
   $("#loadingScreen")?.classList.remove("hidden");
@@ -921,9 +1040,9 @@ function showError(message) {
   refreshIcons();
 }
 
-/* =========================================================
-   LAST UPDATE
-   ========================================================= */
+// ======================================================
+// LAST UPDATE
+// ======================================================
 
 function updateLastUpdate(timestamp) {
   const element = $("#lastUpdate");
@@ -934,8 +1053,13 @@ function updateLastUpdate(timestamp) {
 
   if (!timestamp) {
     element.innerHTML = `
-            <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-            <span>Data berhasil dimuat</span>
+            <span
+                class="h-2 w-2 rounded-full bg-emerald-500"
+            ></span>
+
+            <span>
+                Data berhasil dimuat
+            </span>
         `;
 
     return;
@@ -944,24 +1068,27 @@ function updateLastUpdate(timestamp) {
   const date = new Date(timestamp);
 
   element.innerHTML = `
-        <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+        <span
+            class="h-2 w-2 rounded-full bg-emerald-500"
+        ></span>
+
         <span>
             Update ${date.toLocaleString("id-ID")}
         </span>
     `;
 }
 
-/* =========================================================
-   TABLE SUMMARY
-   ========================================================= */
+// ======================================================
+// TABLE SUMMARY
+// ======================================================
 
 function updateTableSummary(count) {
   setText("#tableSummary", `Menampilkan ${formatNumber(count)} paket pengadaan`);
 }
 
-/* =========================================================
-   UTILITY
-   ========================================================= */
+// ======================================================
+// UTILITY
+// ======================================================
 
 function setText(selector, value) {
   const element = $(selector);
@@ -971,9 +1098,19 @@ function setText(selector, value) {
   }
 }
 
+// ======================================================
+// FORMAT NUMBER
+// ======================================================
+
 function formatNumber(value) {
-  return Number(value || 0).toLocaleString("id-ID");
+  const number = Number(value || 0);
+
+  return number.toLocaleString("id-ID");
 }
+
+// ======================================================
+// FORMAT RUPIAH
+// ======================================================
 
 function formatRupiah(value) {
   if (value === null || value === undefined || value === "") {
@@ -988,24 +1125,58 @@ function formatRupiah(value) {
 
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
+
     currency: "IDR",
+
     maximumFractionDigits: 0,
   }).format(numeric);
 }
+
+// ======================================================
+// PARSE NUMERIC VALUE
+// ======================================================
 
 function parseNumericValue(value) {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
   }
 
-  const text = String(value)
-    .trim()
-    .replace(/[^\d,-]/g, "")
-    .replace(/\./g, "")
-    .replace(",", ".");
+  let text = String(value ?? "").trim();
 
   if (!text) {
     return null;
+  }
+
+  // Hapus simbol Rp dan karakter non angka
+  text = text.replace(/rp/gi, "").replace(/\s/g, "");
+
+  // --------------------------------------------------
+  // FORMAT INDONESIA
+  // Contoh:
+  // 1.500.000
+  // Rp1.500.000
+  // --------------------------------------------------
+
+  if (text.includes(".") && !text.includes(",")) {
+    text = text.replace(/\./g, "");
+  }
+
+  // --------------------------------------------------
+  // FORMAT:
+  // 1.500.000,50
+  // --------------------------------------------------
+  else if (text.includes(".") && text.includes(",")) {
+    text = text.replace(/\./g, "");
+
+    text = text.replace(",", ".");
+  }
+
+  // --------------------------------------------------
+  // FORMAT:
+  // 1500000
+  // --------------------------------------------------
+  else {
+    text = text.replace(/[^\d-]/g, "");
   }
 
   const number = Number(text);
@@ -1013,9 +1184,9 @@ function parseNumericValue(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-/* =========================================================
-   HTML ESCAPE
-   ========================================================= */
+// ======================================================
+// HTML ESCAPE
+// ======================================================
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -1026,13 +1197,17 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
+// ======================================================
+// ATTRIBUTE ESCAPE
+// ======================================================
+
 function escapeAttribute(value) {
   return escapeHtml(value);
 }
 
-/* =========================================================
-   ICON REFRESH
-   ========================================================= */
+// ======================================================
+// ICON REFRESH
+// ======================================================
 
 function refreshIcons() {
   if (window.lucide) {
